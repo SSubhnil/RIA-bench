@@ -2,6 +2,35 @@ import numpy as np
 import itertools
 from ria.samplers.vectorized_env_executor import ParallelEnvExecutor
 
+def rollout_dm_control(env, policy, max_path_length, render=False):
+    time_step = env.reset()
+    path = {
+        "observations": [],
+        "actions": [],
+        "rewards": [],
+        "next_observations": [],
+        "terminals": []
+    }
+
+    for _ in range(max_path_length):
+        action = policy.get_action(time_step.observation)
+        path["observations"].append(time_step.observation)
+        path["actions"].append(action)
+
+        time_step = env.step(action)
+        path["next_observation"].append(time_step.observation)
+        path["rewards"].append(time_step.reward)
+        path["terminals"].append(time_step.last())
+
+        if render:
+            env.render()
+        
+        if time_step.last():
+            break
+    
+    return path
+
+
 
 def rollout_multi(
     vec_env,
