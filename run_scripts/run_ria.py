@@ -19,11 +19,7 @@ def run_experiment(config):
     env, config = get_environment_config(config)
 
     # Save final config after editing config with respect to each environment.
-    EXP_NAME = config["save_name"]
-    EXP_NAME += (
-        "hidden_" + str(config["dim_hidden"]) + "_lr_" + str(config["learning_rate"])
-    )
-    EXP_NAME += "_horizon_" + str(config["horizon"]) + "_seed_" + str(config["seed"])
+    EXP_NAME = f"{config['save_name']}_hidden_{config['dim_hidden']}_lr_{config['learning_rate']}_horizon_{config['horizon']}_seed_{config['seed']}"
 
     exp_dir = os.getcwd() + "/data/" + EXP_NAME + "/" + config.get("exp_name", "")
     logger.configure(

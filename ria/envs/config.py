@@ -4,7 +4,20 @@ from ria.envs.classic_control import *
 import json
 
 def get_environment_config(config):
-    if config['dataset'] == 'pendulum':
+    env_name = config["env_name"]
+    if config.get("use_dm_control", False):
+        domain_name, task_name = env_name.split('_', 1)
+        env = suite.load(domain_name, task_name)
+
+        observation_spec = env-observation_spec()
+        action_spec = env.action_spec()
+
+        # Modify the config to include the dm_contorl specific params
+        config["observation_space"] = observation_spec
+        config["actioin_space"] = action_spec
+    
+    
+    elif config['dataset'] == 'pendulum':
         train_mass_set=[0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.20, 1.25]
 
         train_length_set=[0.75, 0.8, 0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15, 1.20, 1.25]
