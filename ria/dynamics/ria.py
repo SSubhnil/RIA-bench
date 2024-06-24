@@ -1,5 +1,6 @@
 from ria.dynamics.core.layers import MCLMultiHeadedCaDMEnsembleMLP, Reltaional_network
 from ria.dynamics.core.layers import MultiHeadedEnsembleContextPredictor, PureContrastEnsembleContextPredictor
+import collections
 from collections import OrderedDict
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
@@ -136,14 +137,35 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
         self.back_coeff = back_coeff
 
         # Dimensionality of state and action space
-        self.obs_space_dims = obs_space_dims = env.observation_space.shape[0]
-        self.proc_obs_space_dims = proc_obs_space_dims = env.proc_observation_space_dims
-        if len(env.action_space.shape) == 0:
-            self.action_space_dims = action_space_dims = env.action_space.n
-            self.discrete = True
+        if hasattr(env, 'observation_spec'):
+            obs_spec = env.observation_spec
+            if isinstance(obs_spec, OrderedDict):
+                self.obs_space_dims = obs_space_dims = int(sum(np.prod(spec.shape) for spec in obs_spec.values()))
+            else:
+                self.obs_space_dims = obs_space_dims = int(obs_spec.shape[0])
         else:
-            self.action_space_dims = action_space_dims = env.action_space.shape[0]
-            self.discrete = False
+            self.obs_space_dims = obs_space_dims = int(env.observation_spec.shape[0])
+
+        # Check if proc_observation_space_dims exists
+        if hasattr(env, 'proc_observation_space_dims'):
+            self.proc_obs_space_dims = proc_obs_space_dims = int(env.proc_observation_space_dims)
+        else:
+            # If it doesn't exist, set it to obs_space_dims or another appropriate default
+            self.proc_obs_space_dims = proc_obs_space_dims = self.obs_space_dims
+
+        
+        if hasattr(env, 'action_spec'):
+            action_spec = env.action_spec
+            if isinstance(action_spec, OrderedDict):
+                self.action_space_dims = action_space_dims = int(sum(
+                    np.prod(spec.shape) for spec in action_spec.values()
+                ))
+            else:
+                self.action_space_dims = action_space_dims = int(action_spec.shape[0])
+            self.discrete = hasattr(action_spec, 'n') or not hasattr(action_spec, 'shape')
+        else:
+            self.action_space_dims = action_space_dims = int(env.action_space.shape[0])
+            self.discrete = hasattr(env.action_space, 'n') or not hasattr(env.action_space, 'shape')
 
         hidden_nonlinearity = self._activations[hidden_nonlinearity]
         output_nonlinearity = self._activations[output_nonlinearity]
@@ -151,10 +173,10 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
         with tf.variable_scope(name):
             # placeholders
             self.get_min = tf.placeholder_with_default(False, ())
-            self.obs_ph = tf.placeholder(tf.float32, shape=(None, obs_space_dims))
-            self.obs_next_ph = tf.placeholder(tf.float32, shape=(None, obs_space_dims))
+            self.obs_ph = tf.placeholder(tf.float32, shape=(None, int(obs_space_dims)))
+            self.obs_next_ph = tf.placeholder(tf.float32, shape=(None, int(obs_space_dims)))
             self.act_ph = tf.placeholder(tf.float32, shape=(None, action_space_dims))
-            self.delta_ph = tf.placeholder(tf.float32, shape=(None, obs_space_dims))
+            self.delta_ph = tf.placeholder(tf.float32, shape=(None, int(obs_space_dims)))
             self.cp_obs_ph = tf.placeholder(
                 tf.float32, shape=(None, obs_space_dims * self.history_length)
             )
@@ -213,7 +235,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
                 tf.float32, shape=(action_space_dims,)
             )
             self.norm_delta_mean_ph = tf.placeholder(
-                tf.float32, shape=(obs_space_dims,)
+                tf.float32, shape=(int(obs_space_dims),)
             )
             self.norm_delta_std_ph = tf.placeholder(tf.float32, shape=(obs_space_dims,))
             self.norm_cp_obs_mean_ph = tf.placeholder(

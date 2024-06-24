@@ -1,7 +1,8 @@
 from ria.utils.serializable import Serializable
 from ria.utils.utils import remove_scope_from_name
 from ria.dynamics.core.utils import *
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import copy
 from collections import OrderedDict
 

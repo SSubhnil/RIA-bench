@@ -1,20 +1,29 @@
 from ria.envs.normalized_env import normalize
 from ria.envs import *
 from ria.envs.classic_control import *
+from ria.envs.dmc import DMC_Custom
 import json
 from dm_control import suite
 
 def get_environment_config(config):
     if config['dataset'] == 'walker_walk' or config['dataset'] == 'walker_run':
         domain_name, task_name = config["dataset"].split('_', 1)
-        env = suite.load(domain_name, task_name)
+        env = DMC_Custom(domain_name, task_name)
 
-        observation_spec = env.observation_spec()
-        action_spec = env.action_spec()
+        observation_spec = env.observation_spec # Access as attribute
+        action_spec = env.action_spec 
 
         # Modify the config to include the dm_contorl specific params
         config["observation_space"] = observation_spec
         config["action_space"] = action_spec
+        config["num_test"] = 1
+        config["test_range"] = [  # Dummy test range. Need not be used
+            [[3], [0]],
+        ]
+        config['total_timesteps'] = 1000000
+        config['test_embed'] = False
+        config['test_weight'] = False
+        config['test_prederror'] = False
     
     
     elif config['dataset'] == 'pendulum':
@@ -93,6 +102,7 @@ def get_environment_config(config):
         config['max_path_length'] = 1000
         config['total_timesteps'] = 5000000
         config["simulation_param_dim"] = 1
+
 
         env = CrippleHalfCheetahEnv(cripple_set=cripple_set, extreme_set=extreme_set)
         env.seed(config['seed'])

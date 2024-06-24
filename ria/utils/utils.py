@@ -3,6 +3,7 @@ import scipy
 import scipy.signal
 import json
 import tensorflow as tf
+from dm_env import specs
 
 
 def compile_function(inputs, outputs, log_name=None):
@@ -233,4 +234,20 @@ class ClassEncoder(json.JSONEncoder):
             return {"$class": o.__module__ + "." + o.__name__}
         if callable(o):
             return {"function": o.__name__}
-        return json.JSONEncoder.default(self, o)
+        if isinstance(o, specs.BoundedArray):
+            return {
+                'type': 'BoundedArray',
+                'shape': o.shape,
+                'dtype': str(o.dtype),
+                'name': o.name,
+                'minimum': o.minimum.tolist() if hasattr(o.minimum, 'tolist') else o.minimum,
+                'maximum': o.maximum.tolist() if hasattr(o.maximum, 'tolist') else o.maximum,
+            }
+        if isinstance(o, specs.Array):
+            return {
+                'type': 'Array',
+                'shape': o.shape,
+                'dtype': str(o.dtype),
+                'name': o.name,
+            }
+        return super().default(o)

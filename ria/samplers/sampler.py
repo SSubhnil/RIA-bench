@@ -37,10 +37,10 @@ class Sampler(BaseSampler):
         self.context = context
         self.state_diff = state_diff
         self.history_length = history_length
-        if len(env.action_space.shape) == 0:
-            self.act_dim = env.action_space.n
+        if len(env.action_spec.shape) == 0:
+            self.act_dim = env.action_spec.n
         else:
-            self.act_dim = env.action_space.shape[0]
+            self.act_dim = env.action_spec.shape[0]
 
         self.mcl_cadm = mcl_cadm
 

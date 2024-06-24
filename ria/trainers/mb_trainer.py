@@ -6,6 +6,7 @@ from ria.samplers.utils import context_rollout_multi
 from ria.envs.normalized_env import normalize
 from ria.envs.classic_control import *
 from ria.envs import *
+from ria.envs.dmc import DMC_Custom
 from ria.samplers.vectorized_env_executor import ParallelEnvExecutor
 
 import os
@@ -120,9 +121,9 @@ class Trainer(object):
         self.test_n_parallel = test_n_parallel
 
         if sess is None:
-            config = tf.ConfigProto()
+            config = tf.compat.v1.ConfigProto()
             config.gpu_options.allow_growth = True
-            sess = tf.Session(config=config)
+            sess = tf.compat.v1.Session(config=config)
         self.sess = sess
 
     def train(self):
@@ -146,7 +147,10 @@ class Trainer(object):
 
         test_env_list = []
 
-        if self.env_flag == "halfcheetah" or self.env_flag == "halfcheetah_embed" :
+        if self.env_flag == "walker_walk" or self.env_flag == "walker_run":
+            domain_name, task_name = "walker", "walk" if self.env_flag == "walker_walk" else "run"
+            env_cls = lambda: DMC_Custom(domain_name, task_name)
+        elif self.env_flag == "halfcheetah" or self.env_flag == "halfcheetah_embed" :
             env_cls = HalfCheetahEnv
         elif self.env_flag == "cripple_ant":
             env_cls = CrippleAntEnv
@@ -164,12 +168,12 @@ class Trainer(object):
             env_cls = SlimHumanoidStandupEnv
         elif self.env_flag == 'swimmer':
             env_cls = SwimmerEnv
-
+        
         train_env = env_cls()
         train_env.seed(0)
         train_env = normalize(train_env)
         for i in range(0, self.num_test):
-            test_env = env_cls(self.test_range[i][0], self.test_range[i][1])
+            test_env = env_cls()
             test_env.seed(0)
             test_env = normalize(test_env)
             vec_test_env = ParallelEnvExecutor(

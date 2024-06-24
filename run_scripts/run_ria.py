@@ -34,6 +34,10 @@ def run_experiment(config):
         snapshot_mode="last",
         only_test=config["only_test_flag"],
     )
+
+    # for key, value in config.items():
+    #     print(f"Key: {key}, Type: {type(value)}")
+
     json.dump(
         config,
         open(exp_dir + "/params.json", "w"),
@@ -160,16 +164,16 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42, help="random_seed")
     parser.add_argument("--dataset", default='walker_walk', help="environment flag")
     parser.add_argument(
-        "--hidden_size", type=int, default=200, help="size of hidden feature"
+        "--hidden_size", type=int, default=256, help="size of hidden feature"
     )
     parser.add_argument(
-        "--traj_batch_size", type=int, default=250, help="batch size (trajectory)"
+        "--traj_batch_size", type=int, default=256, help="batch size (trajectory)"
     )
     parser.add_argument(
         "--tem_dist", type=float, default=6e-1, help="tem"
     )
     parser.add_argument(
-        "--sample_batch_size", type=int, default=200, help="batch size (sample)"
+        "--sample_batch_size", type=int, default=256, help="batch size (sample)"
     )
     parser.add_argument("--segment_size", type=int, default=10, help="segment size")
     parser.add_argument(
@@ -223,6 +227,13 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+    "--sim_param_dim",
+    type = int,
+    default = 1,
+    help = "flag to use simulation parameter as an input",
+    )
+
+    parser.add_argument(
         "--sep_layer_size",
         type=int,
         default=1,
@@ -263,6 +274,13 @@ if __name__ == "__main__":
         type=int,
         default=0,
         help="non-adaptive planning. just average",
+    )
+
+    parser.add_argument(
+        "--single_train",
+        type=int,
+        default=1,
+        help="For MCLMulti-head",
     )
 
     parser.add_argument('--true_label', action='store_true', help='flag to true_label')
@@ -399,6 +417,8 @@ if __name__ == "__main__":
         "ie_itrs": args.ie_itrs,
         "use_ie": (args.use_ie_flag > 0),
         "use_simulation_param": (args.sim_param_flag > 0),
+        "simulation_param_dim": args.sim_param_dim,
+        "single_train": args.single_train,
         # Ablation
         "non_adaptive_planning": (args.non_adaptive_planning_flag > 0),
         #  Other

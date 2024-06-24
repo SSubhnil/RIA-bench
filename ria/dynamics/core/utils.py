@@ -1,4 +1,5 @@
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import numpy as np
 # from baselines.common.distributions import make_pdtype
 
@@ -908,14 +909,14 @@ def denormalize(data_array, mean, std):
 def create_dense_layer(
     name, ensemble_size, input_dim, output_dim, activation, weight_decay=0.0
 ):
-    weights = tf.get_variable(
+    weights = tf.compat.v1.get_variable(
         "{}_weight".format(name),
         shape=[ensemble_size, input_dim, output_dim],
         initializer=tf.truncated_normal_initializer(
             stddev=1 / (2 * np.sqrt(input_dim))
         ),
     )
-    biases = tf.get_variable(
+    biases = tf.compat.v1.get_variable(
         "{}_bias".format(name),
         shape=[ensemble_size, 1, output_dim],
         initializer=tf.constant_initializer(0.0),

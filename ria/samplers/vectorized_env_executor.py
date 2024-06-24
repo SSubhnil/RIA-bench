@@ -236,7 +236,7 @@ def worker(remote, parent_remote, env_pickle, n_envs, max_path_length, seed, env
     envs = [pickle.loads(env_pickle) for _ in range(n_envs)]
     np.random.seed(seed)
     for env, env_seed in zip(envs, env_seeds):
-        env.seed(env._seed + env_seed)
+        env._env._random_state.seed(env._seed + env_seed)
 
     ts = np.zeros(n_envs, dtype="int")
 
