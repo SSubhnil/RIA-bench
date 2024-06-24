@@ -1,7 +1,7 @@
 from ria.envs.normalized_env import normalize
 from ria.envs import *
 from ria.envs.classic_control import *
-
+import json
 
 def get_environment_config(config):
     if config['dataset'] == 'pendulum':
