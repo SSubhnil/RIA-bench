@@ -2,19 +2,20 @@ from ria.envs.normalized_env import normalize
 from ria.envs import *
 from ria.envs.classic_control import *
 import json
+from dm_control import suite
 
 def get_environment_config(config):
-    env_name = config["env_name"]
+    env_name = config["dataset"]
     if config.get("use_dm_control", False):
         domain_name, task_name = env_name.split('_', 1)
         env = suite.load(domain_name, task_name)
 
-        observation_spec = env-observation_spec()
+        observation_spec = env.observation_spec()
         action_spec = env.action_spec()
 
         # Modify the config to include the dm_contorl specific params
         config["observation_space"] = observation_spec
-        config["actioin_space"] = action_spec
+        config["action_space"] = action_spec
     
     
     elif config['dataset'] == 'pendulum':

@@ -11,7 +11,7 @@ from ria.envs.config import get_environment_config
 from tensorboardX import SummaryWriter
 import json
 import os
-import gym
+import gymnasium as gym
 import argparse
 
 
@@ -150,10 +150,11 @@ def run_experiment(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trajectory-wise MCL")
-    parser.add_argument("--config")
+    parser.add_argument("--config", type=str, require=True)
+    parser.add_argument("--use_dm_control", action="store_true", help="use dm_control environments")
     parser.add_argument("--save_name", default="RIA/", help="experiments name")
-    parser.add_argument("--seed", type=int, default=0, help="random_seed")
-    parser.add_argument("--dataset", default="halfcheetah", help="environment flag")
+    parser.add_argument("--seed", type=int, default=42, help="random_seed")
+    parser.add_argument("--dataset", default="walker_walk", help="environment flag")
     parser.add_argument(
         "--hidden_size", type=int, default=200, help="size of hidden feature"
     )
@@ -272,8 +273,10 @@ if __name__ == "__main__":
     else:
         args.save_name = "/RAW/" + args.save_name
 
-    if args.dataset == "hopper":
-        args.save_name = "/HOPPER/" + args.save_name
+    if args.dataset == "walker_walk":
+        args.save_name = "/WALK/" + args.save_name
+    elif args.dataset== "walker_run":
+        args.save_name = "/RUN/" + args.save_name
     elif args.dataset == "halfcheetah":
         args.save_name = "/HALFCHEETAH/" + args.save_name
     elif args.dataset == "cripple_ant":
