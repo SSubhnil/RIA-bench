@@ -13,7 +13,7 @@ import os.path as osp
 import joblib
 import numpy as np
 from tensorboardX import SummaryWriter
-from tensorflow.contrib.tensorboard.plugins import projector
+from tensorboard.plugins import projector
 
 class Trainer(object):
     """

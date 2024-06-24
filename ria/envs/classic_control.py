@@ -1,14 +1,14 @@
 import math
 from collections import OrderedDict
-
-from gym import spaces
-from gym.envs.classic_control.cartpole import CartPoleEnv
-from gym.envs.classic_control.pendulum import PendulumEnv
+import gymnasium as gym
+from gymnasium import spaces
+from gymnasium.envs.classic_control.cartpole import CartPoleEnv
+from gymnasium.envs.classic_control.pendulum import PendulumEnv
 import numpy as np
 import tensorflow as tf
 import time
 from .base import EnvBinarySuccessMixin
-from gym import error, spaces
+from gymnasium import error, spaces
 
 def convert_observation_to_space(observation):
     if isinstance(observation, dict):

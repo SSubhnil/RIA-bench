@@ -1,3 +1,5 @@
+#python -m run_scripts.run_ria --config True --use_dm_control True --dataset walker_walk --normalize_flag --relation_flag 1 --contrast_flag 1
+
 from ria.dynamics.ria import MCLMultiHeadedCaDMDynamicsModel
 from ria.trainers.mb_trainer import Trainer
 from ria.policies.mpc_controller import MPCController
@@ -10,9 +12,13 @@ from ria.envs.config import get_environment_config
 
 from tensorboardX import SummaryWriter
 import json
-import os
 import gymnasium as gym
 import argparse
+
+import os
+os.environ["PYOPENGL_PLATFORM"] = "osmesa"
+os.environ["MUJOCO_GL"] = "osmesa"
+os.environ['PATH'] = '/local/ffmpeg-7.0-amd64-static/ffmpeg:'
 
 
 def run_experiment(config):
@@ -150,11 +156,9 @@ def run_experiment(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Trajectory-wise MCL")
-    parser.add_argument("--config", type=str, require=True)
-    parser.add_argument("--use_dm_control", action="store_true", help="use dm_control environments")
     parser.add_argument("--save_name", default="RIA/", help="experiments name")
     parser.add_argument("--seed", type=int, default=42, help="random_seed")
-    parser.add_argument("--dataset", default="walker_walk", help="environment flag")
+    parser.add_argument("--dataset", default='walker_walk', help="environment flag")
     parser.add_argument(
         "--hidden_size", type=int, default=200, help="size of hidden feature"
     )

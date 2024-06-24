@@ -5,9 +5,8 @@ import json
 from dm_control import suite
 
 def get_environment_config(config):
-    env_name = config["dataset"]
-    if config.get("use_dm_control", False):
-        domain_name, task_name = env_name.split('_', 1)
+    if config['dataset'] == 'walker_walk' or config['dataset'] == 'walker_run':
+        domain_name, task_name = config["dataset"].split('_', 1)
         env = suite.load(domain_name, task_name)
 
         observation_spec = env.observation_spec()

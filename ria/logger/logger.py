@@ -14,6 +14,7 @@ import tempfile
 import joblib
 import shutil
 from collections import defaultdict
+import multiprocessing
 
 LOG_OUTPUT_FORMATS = ["stdout", "log", "csv"]
 LOG_OUTPUT_FORMATS_MPI = ["log"]
@@ -436,9 +437,9 @@ def configure(
     log_suffix = ""
     if only_test:
         log_suffix += "-test"
-    from mpi4py import MPI
+    
 
-    rank = MPI.COMM_WORLD.Get_rank()
+    rank = multiprocessing.current_process()._identity[0] if multiprocessing.current_process()._identity else 0
     if rank > 0:
         log_suffix = "-rank%03i" % rank
 

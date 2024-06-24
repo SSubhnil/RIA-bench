@@ -1,7 +1,7 @@
 from .env_spec import EnvSpec
 from abc import ABC, abstractmethod
 import collections
-import gym
+import gymnasium as gym
 
 
 class Env(object):

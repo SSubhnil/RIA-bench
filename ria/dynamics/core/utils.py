@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from baselines.common.distributions import make_pdtype
+# from baselines.common.distributions import make_pdtype
 
 def create_mcl_cadm_multiheaded_mlp(
     output_dim,

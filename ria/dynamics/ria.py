@@ -1,7 +1,8 @@
 from ria.dynamics.core.layers import MCLMultiHeadedCaDMEnsembleMLP, Reltaional_network
 from ria.dynamics.core.layers import MultiHeadedEnsembleContextPredictor, PureContrastEnsembleContextPredictor
 from collections import OrderedDict
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+tf.disable_v2_behavior()
 import tensorflow_probability as tfp
 
 import numpy as np
@@ -42,7 +43,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
         segment_size=128,
         learning_rate=0.001,
         normalize_input=True,
-        optimizer=tf.train.AdamOptimizer,
+        optimizer=tf.compat.v1.train.AdamOptimizer,
         valid_split_ratio=0.2,
         rolling_average_persitency=0.99,
         n_forwards=30,

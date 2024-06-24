@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import tensorflow as tf
-from gym import utils
-from gym.envs.mujoco import mujoco_env
+import gymnasium as gym
+from gymnasium import utils
+from gymnasium.envs.mujoco import mujoco_env
 
 
 class CrippleAntEnv(mujoco_env.MujocoEnv, utils.EzPickle):

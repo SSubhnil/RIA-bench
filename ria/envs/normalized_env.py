@@ -1,6 +1,6 @@
 import numpy as np
 from ria.utils.serializable import Serializable
-from gym.spaces import Box
+from gymnasium.spaces import Box
 from ria.spaces import Box as CustomBox
 import time
 # from rand_param_envs.gym.spaces import Box as OldBox
