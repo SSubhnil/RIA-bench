@@ -5,11 +5,14 @@ import collections
 from types import SimpleNamespace
 
 class DMC_Custom:
-    def __init__(self, domain_name, task_name):
+    def __init__(self, domain_name, task_name, seed=None):
         self._env = suite.load(domain_name=domain_name, task_name=task_name)
         self.proc_observation_space_dims = self._get_proc_observation_space_dims()
         self._random_state = np.random.RandomState()
+        self._seed = seed
         self.dt = 0.025
+        if self._seed is not None:
+            self.seed(self._seed)
 
     def _get_proc_observation_space_dims(self):
       # Assuming the processing involves flattening the observations
@@ -65,7 +68,7 @@ class DMC_Custom:
 
     def get_sim_parameters(self):
         # Assuming no additional simulation parameters are used
-        return np.array([])
+        return np.array([0.0])
 
     def num_modifiable_parameters(self):
         # Assuming no additional parameters can be modified
@@ -95,7 +98,10 @@ class DMC_Custom:
             flattened_dim = sum(np.prod(spec.shape) for spec in action_spec.values())
         else:
             flattened_dim = np.prod(action_spec.shape)
-        return SimpleNamespace(shape=(int(flattened_dim),))
+        
+        # Addthe sample method to action_space
+        return SimpleNamespace(shape=(int(flattened_dim),),
+        sample=lambda: np.random.uniform(action_spec.minimum, action_spec.maximum))
 
 
     def render(self, mode='human'):
@@ -103,5 +109,14 @@ class DMC_Custom:
         pass
     
     def seed(self, seed=None):
+        self._seed = seed
         self._random_state.seed(seed)
+    
+    def get_labels(self):
+        # Implement a method to return the labels.
+        # As an example, if there are no specific labels, return an empty list or any required labels.
+        return []
+
+    def _sample_action(self):
+        return np.random.uniform(self.actions_spec.minimum, self.action_spec.maximum)
     

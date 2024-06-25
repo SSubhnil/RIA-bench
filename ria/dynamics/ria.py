@@ -4,6 +4,7 @@ import collections
 from collections import OrderedDict
 import tensorflow.compat.v1 as tf
 tf.disable_v2_behavior()
+
 import tensorflow_probability as tfp
 
 import numpy as np
@@ -1423,7 +1424,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
 
         assert 1 > valid_split_ratio >= 0
 
-        sess = tf.get_default_session()
+        sess = tf.compat.v1.get_default_session()
 
         obs_shape = obs.shape
         obs_next_shape = obs_next.shape
@@ -2046,7 +2047,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
         return np.mean(mean_pred_errors)
 
     def save(self, save_path):
-        sess = tf.get_default_session()
+        sess = tf.compat.v1.get_default_session()
         ps = sess.run(self.params)
         joblib.dump(ps, save_path)
         if self.normalization is not None:
@@ -2054,7 +2055,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
             joblib.dump(self.normalization, norm_save_path)
 
     def load(self, load_path):
-        sess = tf.get_default_session()
+        sess = tf.compat.v1.get_default_session()
         loaded_params = joblib.load(load_path)
         restores = []
         for p, loaded_p in zip(self.params, loaded_params):
@@ -2248,9 +2249,17 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable):
         )
         _path_label = np.tile(_path_label, (1,1, self.future_length))
         _path_label = _path_label.reshape((dataset_size,-1, 1))
-        sim_param_dim = sim_param.shape[2]
-        _sim_param = np.tile(sim_param, (1, 1, self.future_length))
-        _sim_param = _sim_param.reshape((dataset_size, -1, sim_param_dim))
+
+        if sim_param.size == 0:
+            sim_param_dim = 1
+            _sim_param = np.zeros((dataset_size, self.future_length, sim_param_dim))
+        else:
+            sim_param_dim = sim_param.shape[2]
+            max_tile_size = 1024
+            if self.future_length > max_tile_size:
+                self.future_length = max_tile_size
+            _sim_param = np.tile(sim_param, (1, 1, self.future_length))
+            _sim_param = _sim_param.reshape((dataset_size, -1, sim_param_dim))
 
         _obs = _obs[_future_bool > 0, :]
         _act = _act[_future_bool > 0, :]

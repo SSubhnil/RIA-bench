@@ -9,7 +9,6 @@ from ria.envs.normalized_env import normalize
 from ria.utils.utils import ClassEncoder
 from ria.samplers.model_sample_processor import ModelSampleProcessor
 from ria.envs.config import get_environment_config
-
 from tensorboardX import SummaryWriter
 import json
 import gymnasium as gym
@@ -19,6 +18,9 @@ import os
 os.environ["PYOPENGL_PLATFORM"] = "osmesa"
 os.environ["MUJOCO_GL"] = "osmesa"
 os.environ['PATH'] = '/local/ffmpeg-7.0-amd64-static/ffmpeg:'
+
+# Specify GPU index
+os.environ['CUDA_VISIBLE_DEVICES'] = '1' # Uses 2nd GPU on server
 
 
 def run_experiment(config):
@@ -167,13 +169,13 @@ if __name__ == "__main__":
         "--hidden_size", type=int, default=256, help="size of hidden feature"
     )
     parser.add_argument(
-        "--traj_batch_size", type=int, default=256, help="batch size (trajectory)"
+        "--traj_batch_size", type=int, default=64, help="batch size (trajectory)"
     )
     parser.add_argument(
         "--tem_dist", type=float, default=6e-1, help="tem"
     )
     parser.add_argument(
-        "--sample_batch_size", type=int, default=256, help="batch size (sample)"
+        "--sample_batch_size", type=int, default=128, help="batch size (sample)"
     )
     parser.add_argument("--segment_size", type=int, default=10, help="segment size")
     parser.add_argument(
@@ -373,12 +375,12 @@ if __name__ == "__main__":
         "tem_dist": args.tem_dist,
 
         # Sampling
-        "max_path_length": 200,
+        "max_path_length": 500,
         "num_rollouts": num_rollouts,
         "n_parallel": n_parallel,
         "initial_random_samples": True,
         # Training Hyperparameters
-        "n_itr": 20,
+        "n_itr": 200,
         "learning_rate": args.lr,
         "traj_batch_size": args.traj_batch_size,
         "segment_size": args.segment_size,

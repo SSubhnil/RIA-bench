@@ -8,14 +8,19 @@ from ria.envs.classic_control import *
 from ria.envs import *
 from ria.envs.dmc import DMC_Custom
 from ria.samplers.vectorized_env_executor import ParallelEnvExecutor
-
+# Clear TensorFlow session
+tf.keras.backend.clear_session()
 import os
 import os.path as osp
 import joblib
 import numpy as np
 from tensorboardX import SummaryWriter
 from tensorboard.plugins import projector
+from tensorflow.keras import mixed_precision
+tf.compat.v1.disable_eager_execution()
 
+# Set the policy globally
+mixed_precision.set_global_policy('mixed_float16')
 class Trainer(object):
     """
     Training script for Learning to Adapt
@@ -149,7 +154,7 @@ class Trainer(object):
 
         if self.env_flag == "walker_walk" or self.env_flag == "walker_run":
             domain_name, task_name = "walker", "walk" if self.env_flag == "walker_walk" else "run"
-            env_cls = lambda: DMC_Custom(domain_name, task_name)
+            env_cls = lambda: DMC_Custom(domain_name, task_name, seed=42)
         elif self.env_flag == "halfcheetah" or self.env_flag == "halfcheetah_embed" :
             env_cls = HalfCheetahEnv
         elif self.env_flag == "cripple_ant":
@@ -194,7 +199,7 @@ class Trainer(object):
 
         with self.sess.as_default() as sess:
 
-            sess.run(tf.initializers.global_variables())
+            sess.run(tf.compat.v1.global_variables_initializer())
 
             start_time = time.time()
             for itr in range(self.start_itr, self.n_itr):
