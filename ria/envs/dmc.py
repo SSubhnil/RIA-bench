@@ -152,7 +152,7 @@ class DMC_Custom:
     def _sample_action(self):
         return np.random.uniform(self.actions_spec.minimum, self.action_spec.maximum)
 
-        def apply_force(self):
+    def apply_force(self):
         if self.timing == 'random':
             self.interval = max(30, int(np.random.normal(self.interval_mean,
                                                          self.interval_std)))
