@@ -26,7 +26,7 @@ class DMC_Custom:
             'duration_min': 5,  # Minimum duration for swelling force
             'duration_max': 20  # Maximum duration for the swelling force
             }
-        self.confounder_params = confounder_params or default_params
+        self.confounder_params = default_params
 
         # Initialize attributes based on confounder_params
         self.cripple_part = self.confounder_params['cripple_part']

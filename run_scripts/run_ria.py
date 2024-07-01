@@ -20,7 +20,7 @@ os.environ["MUJOCO_GL"] = "osmesa"
 os.environ['PATH'] = '/local/ffmpeg-7.0-amd64-static/ffmpeg:'
 
 # Specify GPU index
-os.environ['CUDA_VISIBLE_DEVICES'] = '1' # Uses 2nd GPU on server
+os.environ['CUDA_VISIBLE_DEVICES'] = '0' # Uses 2nd GPU on server
 
 
 def run_experiment(config):
@@ -298,9 +298,9 @@ if __name__ == "__main__":
         args.save_name = "/RAW/" + args.save_name
 
     if args.dataset == "walker_walk":
-        args.save_name = "/WALK/" + args.save_name
+        args.save_name = "/WALK_test/" + args.save_name
     elif args.dataset== "walker_run":
-        args.save_name = "/RUN/" + args.save_name
+        args.save_name = "/RUN_test/" + args.save_name
     elif args.dataset == "halfcheetah":
         args.save_name = "/HALFCHEETAH/" + args.save_name
     elif args.dataset == "cripple_ant":
