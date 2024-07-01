@@ -17,10 +17,22 @@ import numpy as np
 from tensorboardX import SummaryWriter
 from tensorboard.plugins import projector
 from tensorflow.keras import mixed_precision
-tf.compat.v1.disable_eager_execution()
+
+# Training profiler setup
+import cProfile
+import pstats
+import io
+
 
 # Set the policy globally
+tf.keras.backend.clear_session()
 mixed_precision.set_global_policy('mixed_float16')
+
+# Set up GPU configuration
+physical_devices = tf.config.list_physical_devices('GPU')
+if physical_devices:
+    for gpu in physical_devices:
+        tf.config.experimental.set_memory_growth(gpu, True)
 class Trainer(object):
     """
     Training script for Learning to Adapt
@@ -125,11 +137,24 @@ class Trainer(object):
         self.test_num_rollouts = test_num_rollouts
         self.test_n_parallel = test_n_parallel
 
-        if sess is None:
-            config = tf.compat.v1.ConfigProto()
-            config.gpu_options.allow_growth = True
-            sess = tf.compat.v1.Session(config=config)
-        self.sess = sess
+        # if sess is None:
+        #     self.sess = tf.compat.v1.Session()
+        # else:
+        #     self.sess = sess
+
+    # Setting up the profile code
+    def profile_code(self, func, *args, **kwargs):
+        pr = cProfile.Profile()
+        pr.enable()
+        result = func(*args, **kwargs)
+        pr.disable()
+        s = io.StringIO()
+        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+        ps.print_stats()
+        # Save profiling output to a file
+        with open('profiling_output.txt', 'w') as f:
+            f.write(s.getvalue())
+        return result
 
     def train(self):
         """
@@ -197,184 +222,196 @@ class Trainer(object):
             act_dim = train_env.action_space.shape[0]
             discrete = False
 
-        with self.sess.as_default() as sess:
+        @tf.function
+        def profile_code(self, func, *args, **kwargs):
+            return func(*args, **kwargs)
 
-            sess.run(tf.compat.v1.global_variables_initializer())
+        @tf.function
+        def train_step_mcl_cadm(samples_data, itr):
+            self.dynamics_model.fit(
+                samples_data["concat_obs"],
+                samples_data["concat_act"],
+                samples_data["concat_next_obs"],
+                samples_data["sim_params"],
+                samples_data["cp_observations"],
+                samples_data["cp_actions"],
+                samples_data["concat_bool"],
+                label_path_list=samples_data['label_path_list'],
+                itr=itr,
+                epochs=self.dynamics_model_max_epochs,
+                verbose=True,
+                log_tabular=True,
+                test_weight=self.test_weight,
+            )
 
-            start_time = time.time()
-            for itr in range(self.start_itr, self.n_itr):
-                if not self.only_test:
-                    itr_start_time = time.time()
-                    logger.log(
-                        "\n ---------------- Iteration %d ----------------" % itr
+        @tf.function
+        def train_step_context(samples_data, itr):
+            self.dynamics_model.fit(
+                samples_data["concat_obs"],
+                samples_data["concat_act"],
+                samples_data["concat_next_obs"],
+                samples_data["cp_observations"],
+                samples_data["cp_actions"],
+                samples_data["concat_bool"],
+                label_path_list=samples_data['label_path_list'],
+                itr=itr,
+                epochs=self.dynamics_model_max_epochs,
+                verbose=True,
+                log_tabular=True,
+                test_weight=self.test_weight,
+            )
+
+        @tf.function
+        def train_step_default(samples_data, itr):
+            self.dynamics_model.fit(
+                samples_data["observations"],
+                samples_data["actions"],
+                samples_data["next_observations"],
+                samples_data["sim_params"],
+                label_path_list=samples_data['label_path_list'],
+                itr=itr,
+                epochs=self.dynamics_model_max_epochs,
+                verbose=True,
+                log_tabular=True,
+            )
+        
+        start_time = time.time()
+        for itr in range(self.start_itr, self.n_itr):
+            if not self.only_test:
+                itr_start_time = time.time()
+                logger.log(
+                    "\n ---------------- Iteration %d ----------------" % itr
+                )
+
+                time_env_sampling_start = time.time()
+
+                if self.initial_random_samples and itr == 0 and (not self.test_weight):
+                    logger.log("Obtaining random samples from the environment...")
+                    env_paths = self.sampler.obtain_samples(
+                        log=True, random=True, log_prefix=""
                     )
-
-                    time_env_sampling_start = time.time()
-
-                    if self.initial_random_samples and itr == 0 and (not self.test_weight):
-                        logger.log("Obtaining random samples from the environment...")
-                        env_paths = self.sampler.obtain_samples(
-                            log=True, random=True, log_prefix=""
-                        )
-                    else:
-                        logger.log(
-                            "Obtaining samples from the environment using the policy..."
-                        )
-                        env_paths = self.sampler.obtain_samples(log=True, log_prefix="")
-
-                    logger.record_tabular(
-                        "Time-EnvSampling", time.time() - time_env_sampling_start
-                    )
-
-                    """ -------------- Process the samples ----------------"""
-                    logger.log("Processing environment samples...")
-
-                    time_env_samp_proc = time.time()
-                    samples_data = self.sample_processor.process_samples(
-                        env_paths, log=True, itr=itr
-                    )
-                    logger.record_tabular(
-                        "Time-EnvSampleProc", time.time() - time_env_samp_proc
-                    )
-
-                    """ --------------- Fit the dynamics model --------------- """
-                    samples_data['label_path_list'] = np.expand_dims(samples_data['label_path_list'] , -1)
-                    time_fit_start = time.time()
-
-                    logger.log(
-                        "Training dynamics model for %i epochs ..."
-                        % (self.dynamics_model_max_epochs)
-                    )
-
-                    if self.mcl_cadm:
-                        self.dynamics_model.fit(
-                            samples_data["concat_obs"],
-                            samples_data["concat_act"],
-                            samples_data["concat_next_obs"],
-                            samples_data["sim_params"],
-                            samples_data["cp_observations"],
-                            samples_data["cp_actions"],
-                            samples_data["concat_bool"],
-                            label_path_list= samples_data['label_path_list'],
-                            itr=itr,
-                            epochs=self.dynamics_model_max_epochs,
-                            verbose=True,
-                            log_tabular=True,
-                            test_weight=self.test_weight,
-                        )
-                    elif self.context:
-                        self.dynamics_model.fit(
-                            samples_data["concat_obs"],
-                            samples_data["concat_act"],
-                            samples_data["concat_next_obs"],
-                            samples_data["cp_observations"],
-                            samples_data["cp_actions"],
-                            samples_data["concat_bool"],
-                            label_path_list=samples_data['label_path_list'],
-                            itr=itr,
-                            epochs=self.dynamics_model_max_epochs,
-                            verbose=True,
-                            log_tabular=True,
-                            test_weight=self.test_weight,
-                        )
-                    else:
-                        self.dynamics_model.fit(
-                            samples_data["observations"],
-                            samples_data["actions"],
-                            samples_data["next_observations"],
-                            samples_data["sim_params"],
-                            label_path_list=samples_data['label_path_list'],
-                            itr=itr,
-                            epochs=self.dynamics_model_max_epochs,
-                            verbose=True,
-                            log_tabular=True,
-                        )
-
-                    logger.record_tabular("Time-ModelFit", time.time() - time_fit_start)
-
-                    """ ------------------- Logging --------------------------"""
-                    logger.logkv("Itr", itr)
-                    logger.logkv("n_timesteps", self.sampler.total_timesteps_sampled)
-
-                    logger.logkv("Time", time.time() - start_time)
-                    logger.logkv("ItrTime", time.time() - itr_start_time)
-
-                    logger.log("Saving snapshot...")
-                    params = self.get_itr_snapshot(itr)
-                    self.log_diagnostics(env_paths, "")
-                    logger.save_itr_params(itr, params)
-                    print(logger.get_dir())
-                    checkdir = osp.join(logger.get_dir(), "checkpoints")
-                    os.makedirs(checkdir, exist_ok=True)
-                    savepath = osp.join(checkdir, "params_epoch_{}".format(itr))
-                    self.dynamics_model.save(savepath)
-                    logger.log("Saved")
-
-                    logger.dumpkvs()
                 else:
-                    logger.log("Test - {}/{} iterations".format(itr + 1, self.n_itr))
-                    checkdir = osp.join(logger.get_dir(), "checkpoints")
-                    loadpath = osp.join(checkdir, "params_epoch_{}".format(itr))
-                    self.dynamics_model.load(loadpath)
-                    logger.log("Succesfully loaded parameters from {}".format(loadpath))
-                    if itr != 0:
-                        itr_times.append(time.time() - t0)
-                        avg_itr_time = np.mean(itr_times)
-                        eta = avg_itr_time * (self.n_itr - itr) / 60.0
-                        logger.log(
-                            "Test - {}/{} iterations | ETA: {:.2f} mins".format(
-                                itr + 1, self.n_itr, eta
-                            )
-                        )
-                        t0 = time.time()
+                    logger.log(
+                        "Obtaining samples from the environment using the policy..."
+                    )
+                    env_paths = self.sampler.obtain_samples(log=True, log_prefix="")
 
-                if self.no_test:
-                    print("no test")
+                logger.record_tabular(
+                    "Time-EnvSampling", time.time() - time_env_sampling_start
+                )
+
+                """ -------------- Process the samples ----------------"""
+                logger.log("Processing environment samples...")
+
+                time_env_samp_proc = time.time()
+                samples_data = self.sample_processor.process_samples(
+                    env_paths, log=True, itr=itr
+                )
+                logger.record_tabular(
+                    "Time-EnvSampleProc", time.time() - time_env_samp_proc
+                )
+
+                """ --------------- Fit the dynamics model --------------- """
+                samples_data['label_path_list'] = np.expand_dims(samples_data['label_path_list'] , -1)
+                time_fit_start = time.time()
+
+                logger.log(
+                    "Training dynamics model for %i epochs ..."
+                    % (self.dynamics_model_max_epochs)
+                )
+                
+                if self.mcl_cadm:
+                    profile_code(self, train_step_mcl_cadm, samples_data, itr)
+                elif self.context:
+                    profile_code(self, train_step_context, samples_data, itr)
                 else:
-                    if itr % 1 == 0 or itr == self.n_itr - 1:
-                        if self.context:
-                            rollout = context_rollout_multi
-                        elif self.mcl_cadm:
-                            rollout = context_rollout_multi
-                        else:
-                            rollout = rollout_multi
+                    profile_code(self, train_step_default, samples_data, itr)
 
-                        total_test_reward = 0.0
-                        for i in range(0, self.num_test):
-                            test_reward,_ = rollout(
-                                vec_env=test_env_list[i],
-                                policy=self.policy,
-                                discrete=discrete,
-                                num_rollouts=self.test_num_rollouts,
-                                test_total=self.total_test,
-                                act_dim=act_dim,
-                                use_cem=self.use_cem,
-                                horizon=self.horizon,
-                                context=self.context,
-                                history_length=self.history_length,
-                                state_diff=self.state_diff,
-                                mcl_cadm=self.mcl_cadm,
-                                env=train_env,
-                            )
+                logger.record_tabular("Time-ModelFit", time.time() - time_fit_start)
 
-                            print("test c" + str(i) + " reward: " + str(test_reward))
-                            f_test_list[i].write("{}\n".format(test_reward))
-                            f_test_list[i].flush()
-                            os.fsync(f_test_list[i].fileno())
-                            self.writer.add_scalar(
-                                "test/c{}".format(i), test_reward, itr
-                            )
-                            total_test_reward += test_reward / self.num_test
+                """ ------------------- Logging --------------------------"""
+                logger.logkv("Itr", itr)
+                logger.logkv("n_timesteps", self.sampler.total_timesteps_sampled)
 
-                        f_test_tot.write("{}\n".format(total_test_reward))
-                        f_test_tot.flush()
-                        os.fsync(f_test_tot.fileno())
+                logger.logkv("Time", time.time() - start_time)
+                logger.logkv("ItrTime", time.time() - itr_start_time)
+
+                logger.log("Saving snapshot...")
+                params = self.get_itr_snapshot(itr)
+                self.log_diagnostics(env_paths, "")
+                logger.save_itr_params(itr, params)
+                print(logger.get_dir())
+                checkdir = osp.join(logger.get_dir(), "checkpoints")
+                os.makedirs(checkdir, exist_ok=True)
+                savepath = osp.join(checkdir, "params_epoch_{}".format(itr))
+                self.dynamics_model.save(savepath)
+                logger.log("Saved")
+
+                logger.dumpkvs()
+            else:
+                logger.log("Test - {}/{} iterations".format(itr + 1, self.n_itr))
+                checkdir = osp.join(logger.get_dir(), "checkpoints")
+                loadpath = osp.join(checkdir, "params_epoch_{}".format(itr))
+                self.dynamics_model.load(loadpath)
+                logger.log("Succesfully loaded parameters from {}".format(loadpath))
+                if itr != 0:
+                    itr_times.append(time.time() - t0)
+                    avg_itr_time = np.mean(itr_times)
+                    eta = avg_itr_time * (self.n_itr - itr) / 60.0
+                    logger.log(
+                        "Test - {}/{} iterations | ETA: {:.2f} mins".format(
+                            itr + 1, self.n_itr, eta
+                        )
+                    )
+                    t0 = time.time()
+
+            if self.no_test:
+                print("no test")
+            else:
+                if itr % 1 == 0 or itr == self.n_itr - 1:
+                    if self.context:
+                        rollout = context_rollout_multi
+                    elif self.mcl_cadm:
+                        rollout = context_rollout_multi
+                    else:
+                        rollout = rollout_multi
+
+                    total_test_reward = 0.0
+                    for i in range(0, self.num_test):
+                        test_reward,_ = rollout(
+                            vec_env=test_env_list[i],
+                            policy=self.policy,
+                            discrete=discrete,
+                            num_rollouts=self.test_num_rollouts,
+                            test_total=self.total_test,
+                            act_dim=act_dim,
+                            use_cem=self.use_cem,
+                            horizon=self.horizon,
+                            context=self.context,
+                            history_length=self.history_length,
+                            state_diff=self.state_diff,
+                            mcl_cadm=self.mcl_cadm,
+                            env=train_env,
+                        )
+
+                        print("test c" + str(i) + " reward: " + str(test_reward))
+                        f_test_list[i].write("{}\n".format(test_reward))
+                        f_test_list[i].flush()
+                        os.fsync(f_test_list[i].fileno())
                         self.writer.add_scalar(
-                            "test/total_test", total_test_reward, itr
+                            "test/c{}".format(i), test_reward, itr
                         )
+                        total_test_reward += test_reward / self.num_test
 
-                # if itr == 1:
-                #     sess.graph.finalize()
+                    f_test_tot.write("{}\n".format(total_test_reward))
+                    f_test_tot.flush()
+                    os.fsync(f_test_tot.fileno())
+                    self.writer.add_scalar(
+                        "test/total_test", total_test_reward, itr
+                    )
+
+            # if itr == 1:
+            #     sess.graph.finalize()
 
             for i in range(0, self.num_test):
                 f_test_list[i].close()
@@ -382,7 +419,6 @@ class Trainer(object):
             f_test_tot.close()
             f_train.close()
         logger.log("Training finished")
-        self.sess.close()
 
     def get_itr_snapshot(self, itr):
         """

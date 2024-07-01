@@ -16,7 +16,7 @@ class DMC_Custom:
         
         default_params = {
             'cripple_part': None, # 'right_hip/_knee/_ankle' or 'left_hip/_knee/_ankle'
-            'force_type': 'step', # can be None, swelling, step
+            'force_type': None, # can be None, swelling, step
             'timing': 'random',
             'body_part': 'torso',
             'random_chance': 0.8,  # Chance to apply random force
@@ -26,7 +26,7 @@ class DMC_Custom:
             'duration_min': 5,  # Minimum duration for swelling force
             'duration_max': 20  # Maximum duration for the swelling force
             }
-        self.confounder_params = confounder_params or default_params
+        self.confounder_params = default_params
 
         # Initialize attributes based on confounder_params
         self.cripple_part = self.confounder_params['cripple_part']

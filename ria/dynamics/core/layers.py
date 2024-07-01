@@ -1,8 +1,8 @@
 from ria.utils.serializable import Serializable
 from ria.utils.utils import remove_scope_from_name
 from ria.dynamics.core.utils import *
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf
+
 import copy
 from collections import OrderedDict
 
@@ -28,7 +28,7 @@ class Layer(Serializable):
 
     def __init__(
         self,
-        name,
+        model_name,
         input_dim,
         output_dim,
         hidden_sizes=(32, 32),
@@ -112,7 +112,7 @@ class Layer(Serializable):
 
         self.input_dim = input_dim
         self.output_dim = output_dim
-        self.name = name
+        self.model_name = model_name
         self.input_var = input_var
 
         self.hidden_sizes = hidden_sizes
@@ -272,11 +272,12 @@ class Layer(Serializable):
 
 
 # CHECK
-class MCLMultiHeadedCaDMEnsembleMLP(Layer):
+class MCLMultiHeadedCaDMEnsembleMLP(Layer, tf.Module):
     def __init__(self, *args, **kwargs):
         # store the init args for serialization and call the super constructors
         Serializable.quick_init(self, locals())
         Layer.__init__(self, *args, **kwargs)
+        tf.Module.__init__(self, name=kwargs.get('name', 'MCLMultiHeadedCaDMEnsembleMLP'))
 
         self.build_graph()
 
@@ -289,7 +290,7 @@ class MCLMultiHeadedCaDMEnsembleMLP(Layer):
             self.cem_init_mean_var = None
             self.cem_init_std_var = None
 
-        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+        with tf.name_scope(self.model_name):
 
             if self._params is None:
                 # build the actual policy network
@@ -361,31 +362,32 @@ class MCLMultiHeadedCaDMEnsembleMLP(Layer):
                 )
 
                 # save the policy's trainable variables in dicts
-                current_scope = tf.get_default_graph().get_name_scope()
-                trainable_vars = tf.get_collection(
-                    tf.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope
-                )
+                current_scope = tf.get_current_name_scope()
+                # trainable_vars = tf.get_collection(
+                #     tf.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope
+                # )
                 self._params = OrderedDict(
                     [
                         (remove_scope_from_name(var.name, current_scope), var)
-                        for var in trainable_vars
+                        for var in self.trainable_variables
                     ]
                 )
 
 
 # CHECK
-class MultiHeadedEnsembleContextPredictor(Layer):
+class MultiHeadedEnsembleContextPredictor(Layer, tf.Module):
     def __init__(self, *args, **kwargs):
         # store the init args for serialization and call the super constructors
         Serializable.quick_init(self, locals())
         Layer.__init__(self, *args, **kwargs)
+        tf.Module.__init__(self, name=kwargs.get('name', 'MultiHeadedEnsembleContextPredictor'))
         self.build_graph()
 
     def build_graph(self):
         """
         Builds computational graph for policy
         """
-        with tf.variable_scope(self.name, reuse=tf.AUTO_REUSE):
+        with tf.name_scope(self.model_name):
             # build the actual policy network
             (
                 self.context_output_var,
@@ -410,30 +412,31 @@ class MultiHeadedEnsembleContextPredictor(Layer):
             )
 
             # save the policy's trainable variables in dicts
-            current_scope = tf.get_default_graph().get_name_scope()
-            trainable_vars = tf.get_collection(
-                tf.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope
-            )
+            current_scope = tf.get_current_name_scope()
+            # trainable_vars = tf.get_collection(
+            #     tf.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope
+            # )
             self._params = OrderedDict(
                 [
                     (remove_scope_from_name(var.name, current_scope), var)
-                    for var in trainable_vars
+                    for var in self.trainable_variables
                 ]
             )
 
 # CHECKED
-class PureContrastEnsembleContextPredictor(Layer):
+class PureContrastEnsembleContextPredictor(Layer, tf.Module):
     def __init__(self, *args, **kwargs):
         # store the init args for serialization and call the super constructors
         Serializable.quick_init(self, locals())
         Layer.__init__(self, *args, **kwargs)
+        tf.Module.__init__(self, name=kwargs.get('name', 'PureContrastEnsembleContextPredictor'))
         self.build_graph()
 
     def build_graph(self):
         """
         Builds computational graph for policy
         """
-        with tf.compat.v1.variable_scope(self.name, reuse=tf.compat.v1.AUTO_REUSE):
+        with tf.name_scope(self.model_name):
             # build the actual policy network
             self.context_output_var, self.l2_regs, self.forward, self.projection_output, self.projection, self.projection_output_mi, self.projection_mi \
             = create_contrast_ensemble_pure_context_predictor(context_hidden_sizes=self.context_hidden_sizes,
@@ -459,23 +462,24 @@ class PureContrastEnsembleContextPredictor(Layer):
                                                      )
 
             # save the policy's trainable variables in dicts
-            current_scope = tf.compat.v1.get_default_graph().get_name_scope()
-            trainable_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope)
+            current_scope = tf.get_current_name_scope()
+            # trainable_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope)
             self._params = OrderedDict([(remove_scope_from_name(var.name, current_scope), var)
-                                        for var in trainable_vars])
+                                        for var in self.trainable_variables])
 
-class Reltaional_network(Layer):
+class Relational_network(Layer, tf.Module):
     def __init__(self, *args, **kwargs):
         # store the init args for serialization and call the super constructors
         Serializable.quick_init(self, locals())
         Layer.__init__(self, *args, **kwargs)
+        tf.Module.__init__(self, name=kwargs.get('name', 'Relational_network'))
         self.build_graph()
 
     def build_graph(self):
         """
         Builds computational graph for policy
         """
-        with tf.compat.v1.variable_scope(self.name, reuse=tf.compat.v1.AUTO_REUSE):
+        with tf.name_scope(self.model_name):
             # build the actual policy network
             self.l2_regs, self.forward \
             = create_relational_net(
@@ -489,7 +493,7 @@ class Reltaional_network(Layer):
                                     )
 
             # save the policy's trainable variables in dicts
-            current_scope = tf.compat.v1.get_default_graph().get_name_scope()
-            trainable_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope)
+            current_scope = tf.get_current_name_scope()
+            # trainable_vars = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.TRAINABLE_VARIABLES, scope=current_scope)
             self._params = OrderedDict([(remove_scope_from_name(var.name, current_scope), var)
-                                        for var in trainable_vars])
+                                        for var in self.trainable_variables])

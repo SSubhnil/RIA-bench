@@ -1,6 +1,7 @@
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+import tensorflow as tf
 import numpy as np
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.regularizers import l2
 # from baselines.common.distributions import make_pdtype
 
 def create_mcl_cadm_multiheaded_mlp(
@@ -42,7 +43,6 @@ def create_mcl_cadm_multiheaded_mlp(
     obs_preproc_fn=None,
     obs_postproc_fn=None,
     deterministic=False,
-    reuse=False,
     use_simulation_param=False,
     simulation_param_var=None,
     simulation_param_dim=None,
@@ -909,28 +909,36 @@ def denormalize(data_array, mean, std):
 def create_dense_layer(
     name, ensemble_size, input_dim, output_dim, activation, weight_decay=0.0
 ):
-    weights = tf.compat.v1.get_variable(
-        "{}_weight".format(name),
-        shape=[ensemble_size, input_dim, output_dim],
-        initializer=tf.truncated_normal_initializer(
-            stddev=1 / (2 * np.sqrt(input_dim))
-        ),
-    )
-    biases = tf.compat.v1.get_variable(
-        "{}_bias".format(name),
-        shape=[ensemble_size, 1, output_dim],
-        initializer=tf.constant_initializer(0.0),
-    )
+    class EnsembleDenseLayer(tf.keras.layers.Layer):
+        def __init__(self, ensemble_size, input_dim, output_dim, activation, weight_decay, name):
+            super(EnsembleDenseLayer, self).__init__(name=name)
+            self.ensemble_size = ensemble_size
+            self.input_dim = input_dim
+            self.output_dim = output_dim
+            self.activation = activation
+            self.weight_decay = weight_decay
+            self.dense_layers = [
+                Dense(
+                    output_dim,
+                    activation=activation,
+                    kernel_initializer='glorot_uniform',
+                    kernel_regularizer=l2(weight_decay),
+                    name=f"{name}_dense_{i}"
+                )
+                for i in range(ensemble_size)
+            ]
 
-    l2_reg = tf.multiply(
-        weight_decay, tf.nn.l2_loss(weights), name="{}_l2_reg".format(name)
-    )
+        def call(self, inputs):
+            outputs = tf.stack([dense_layer(inputs) for dense_layer in self.dense_layers], axis=0)
+            return outputs
+
+    layer = EnsembleDenseLayer(ensemble_size, input_dim, output_dim, activation, weight_decay, name)
 
     def _thunk(input_tensor):
-        out = tf.matmul(input_tensor, weights) + biases
-        if activation != None:
-            out = activation(out)
-        # out = activation(out)
+        out = layer(input_tensor)
         return out
 
-    return _thunk, l2_reg
+    l2_regs = [tf.nn.l2_loss(layer.dense_layers[i].kernel) for i in range(ensemble_size)]
+    total_l2_reg = tf.add_n(l2_regs)
+    
+    return _thunk, total_l2_reg

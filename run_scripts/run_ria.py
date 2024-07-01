@@ -20,7 +20,7 @@ os.environ["MUJOCO_GL"] = "osmesa"
 os.environ['PATH'] = '/local/ffmpeg-7.0-amd64-static/ffmpeg:'
 
 # Specify GPU index
-os.environ['CUDA_VISIBLE_DEVICES'] = '1' # Uses 2nd GPU on server
+#os.environ['CUDA_VISIBLE_DEVICES'] = '0' # Uses 2nd GPU on server
 
 
 def run_experiment(config):
@@ -50,7 +50,7 @@ def run_experiment(config):
     writer = SummaryWriter(exp_dir)
 
     dynamics_model = MCLMultiHeadedCaDMDynamicsModel(
-        name="dyn_model",
+        model_name="dyn_model",
         env=env,
         learning_rate=config["learning_rate"],
         hidden_sizes=config["hidden_sizes"],
@@ -175,11 +175,11 @@ if __name__ == "__main__":
         "--tem_dist", type=float, default=6e-1, help="tem"
     )
     parser.add_argument(
-        "--sample_batch_size", type=int, default=128, help="batch size (sample)"
+        "--sample_batch_size", type=int, default=64, help="batch size (sample)"
     )
     parser.add_argument("--segment_size", type=int, default=10, help="segment size")
     parser.add_argument(
-        "--n_epochs", type=int, default=50, help="training epochs per iteration"
+        "--n_epochs", type=int, default=30, help="training epochs per iteration"
     )
     parser.add_argument("--lr", type=float, default=0.001, help="learning_rate")
     parser.add_argument("--horizon", type=int, default=30, help="horrizon for planning")
@@ -298,9 +298,9 @@ if __name__ == "__main__":
         args.save_name = "/RAW/" + args.save_name
 
     if args.dataset == "walker_walk":
-        args.save_name = "/WALK/" + args.save_name
+        args.save_name = "/WALK_1_test/" + args.save_name
     elif args.dataset== "walker_run":
-        args.save_name = "/RUN/" + args.save_name
+        args.save_name = "/RUN_1/" + args.save_name
     elif args.dataset == "halfcheetah":
         args.save_name = "/HALFCHEETAH/" + args.save_name
     elif args.dataset == "cripple_ant":
