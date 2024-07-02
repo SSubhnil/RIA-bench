@@ -20,7 +20,7 @@ os.environ["MUJOCO_GL"] = "osmesa"
 os.environ['PATH'] = '/local/ffmpeg-7.0-amd64-static/ffmpeg:'
 
 # Specify GPU index
-#os.environ['CUDA_VISIBLE_DEVICES'] = '0' # Uses 2nd GPU on server
+os.environ['CUDA_VISIBLE_DEVICES'] = '0' # Uses 2nd GPU on server
 
 
 def run_experiment(config):

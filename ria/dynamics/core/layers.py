@@ -221,7 +221,8 @@ class Layer(Serializable):
         Returns:
             (dict) : a dict of all trainable Variables
         """
-        return self._params
+        #return self._params
+        return {var.name: var for var in self.trainable_variables}
 
     def get_param_values(self):
         """
@@ -230,7 +231,7 @@ class Layer(Serializable):
         Returns:
             (list) : list of values for parameters
         """
-        param_values = tf.get_default_session().run(self._params)
+        param_values = {k: v.numpy() for k, v in self._params.items()}
         return param_values
 
     def set_params(self, policy_params):
@@ -247,14 +248,14 @@ class Layer(Serializable):
         if self._assign_ops is None:
             assign_ops, assign_phs = [], []
             for var in self.get_params().values():
-                assign_placeholder = tf.placeholder(dtype=var.dtype)
-                assign_op = tf.assign(var, assign_placeholder)
+                # assign_placeholder = tf.placeholder(dtype=var.dtype)
+                assign_op = tf.assign(policy_params[var.name])
                 assign_ops.append(assign_op)
-                assign_phs.append(assign_placeholder)
             self._assign_ops = assign_ops
-            self._assign_phs = assign_phs
-        feed_dict = dict(zip(self._assign_phs, policy_params.values()))
-        tf.get_default_session().run(self._assign_ops, feed_dict=feed_dict)
+        # feed_dict = dict(zip(self._assign_phs, policy_params.values()))
+        # tf.get_default_session().run(self._assign_ops, feed_dict=feed_dict)
+        for assign_op, value in zip(self._assign_ops, policy_params.values()):
+            assign_op(value)
 
     def __getstate__(self):
         state = {

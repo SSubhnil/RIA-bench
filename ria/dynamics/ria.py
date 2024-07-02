@@ -32,7 +32,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
         "softmax": tf.nn.softmax,
         "swish": lambda x: x * tf.sigmoid(x),
     }
-
+    
     def __init__(
         self,
         model_name,
@@ -287,7 +287,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
 
             with tf.name_scope("context_model"):
                 if contrast_flag:
-                    cp = PureContrastEnsembleContextPredictor(model_name,
+                    self.cp = PureContrastEnsembleContextPredictor(model_name,
                                                                 output_dim=0,
                                                                 input_dim=0,
                                                                 context_dim=(obs_space_dims + action_space_dims) * self.history_length,
@@ -314,8 +314,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
 
                     # @lazy_property
 
-                    self.bs_cp_var = (cp.context_output_var)
-                    self.projection_vector = cp.projection_output
+                    self.bs_cp_var = (self.cp.context_output_var)
+                    self.projection_vector = self.cp.projection_output
                     if self.relation_flag:
                         self.rn = Relational_network(model_name,
                                                 output_dim=0,
@@ -326,7 +326,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                                                 context_out_dim=self.context_out_dim,
                                                 )
                 else:
-                    cp = MultiHeadedEnsembleContextPredictor(
+                    self.cp = MultiHeadedEnsembleContextPredictor(
                         model_name,
                         output_dim=0,
                         input_dim=0,
@@ -347,12 +347,12 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                         use_global_head=self.use_global_head,
                     )
                     self.bs_cp_var = (
-                        cp.context_output_var
+                        self.cp.context_output_var
                     )  # [head_size, ensemble_size, None, context_dim]
 
             # create MLP
             with tf.name_scope("ff_model"):
-                mlp = MCLMultiHeadedCaDMEnsembleMLP(
+                self.mlp = MCLMultiHeadedCaDMEnsembleMLP(
                     model_name,
                     input_dim=0,
                     output_dim=obs_space_dims,
@@ -403,7 +403,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     # CaDM
                     context_obs_var=self.cp_obs_ph,
                     context_act_var=self.cp_act_ph,
-                    cp_forward=cp.forward,
+                    cp_forward=self.cp.forward,
                     bs_input_cp_var=self.bs_cp_var,
                     context_out_dim=self.context_out_dim,
                     build_policy_graph=True,
@@ -412,7 +412,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                 )
 
             with tf.name_scope("bb_model"):
-                back_mlp = MCLMultiHeadedCaDMEnsembleMLP(
+                self.back_mlp = MCLMultiHeadedCaDMEnsembleMLP(
                     model_name,
                     input_dim=0,
                     output_dim=obs_space_dims,
@@ -471,8 +471,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                 )
 
             # self.params = tf.trainable_variables()
-            self.delta_pred = mlp.output_var
-            self.embedding = mlp.embedding
+            self.delta_pred = self.mlp.output_var
+            self.embedding = self.mlp.embedding
 
             # extend state-action pairs
             self.bs_obs_ph_dist = tf.reshape(tf.tile(bs_obs, [1, 1, tf.shape(bs_obs)[1]]),
@@ -511,10 +511,10 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                 self.back_x_dist = tf.concat([self.bs_normalized_input_obs_next, self.bs_normalized_input_act], 2)
 
             ## Do- calculus:  concate z with all state-action pairs in this batch
-            self.xx_dist, self.mu_dist, self.logvar_dist, self.embedding_dist, self.max_log_var_dist, self.min_log_var_dist = mlp.forward(
+            self.xx_dist, self.mu_dist, self.logvar_dist, self.embedding_dist, self.max_log_var_dist, self.min_log_var_dist = self.mlp.forward(
                 self.x_dist, self.bs_cp_var_dist)
             if self.back_coeff > 0:
-                self.back_xx_dist, self.back_mu_dist, self.back_logvar_dist, self.back_embedding_dist, self.back_max_log_var_dist, self.back_min_log_var_dist = back_mlp.forward(
+                self.back_xx_dist, self.back_mu_dist, self.back_logvar_dist, self.back_embedding_dist, self.back_max_log_var_dist, self.back_min_log_var_dist = self.back_mlp.forward(
                     self.back_x_dist, self.bs_cp_var_dist)
 
             self.mu_dist = tf.reshape(
@@ -765,31 +765,41 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
             if self.no_weight:
                 self.weight_contrast = None
 
-            self.trainable_variables = (
-            list(mlp.get_params().values()) +
-            list(back_mlp.get_params().values()) +
-            list(cp.get_params().values()) +
-            list(self.rn.get_params().values())
-            )
+            # self._trainable_variables = self.custom_trainable_variables
+            # self._trainable_variables = (
+            # list(self.mlp.get_params().values()) +
+            # list(self.back_mlp.get_params().values()) +
+            # list(self.cp.get_params().values()) +
+            # list(self.rn.get_params().values())
+            # )
+            # if self.contrast_flag:
+            #     self.contrast_loss = self.relational_loss(z=self.bs_cp_var, y=self.label_path, rn=self.rn,
+            #                                                   weight_matrix=self.weight_contrast)
+
+            #     self.all_contrast_optimizer = optimizer(self.learning_rate)
+            #     if self.relation_flag:
+            #         self.all_contrast_train_op = self.all_contrast_optimizer.minimize \
+            #             (self.contrast_loss + tf.reduce_mean(cp.l2_regs) + tf.reduce_mean(self.rn.l2_regs))
+            #     else:
+            #         self.all_contrast_train_op = self.all_contrast_optimizer.minimize \
+            #             (self.contrast_loss + tf.reduce_mean(cp.l2_regs))
+
 
             if self.contrast_flag:
                 self.contrast_loss = self.relational_loss(z=self.bs_cp_var, y=self.label_path, rn=self.rn,
                                                                 weight_matrix=self.weight_contrast)
 
                 self.all_contrast_optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
-                if self.relation_flag:
-                    total_loss = self.contrast_loss + tf.reduce_mean(cp.l2_regs) + tf.reduce_mean(self.rn.l2_regs)              
-                else:
-                    total_loss = self.contrast_loss + tf.reduce_mean(cp.l2_regs)
-
                 with tf.GradientTape() as tape:
-                    loss = total_loss
+                    if self.relation_flag:
+                        total_loss = self.contrast_loss + tf.reduce_mean(self.cp.l2_regs) + tf.reduce_mean(self.rn.l2_regs)              
+                    else:
+                        total_loss = self.contrast_loss + tf.reduce_mean(self.cp.l2_regs)
+
                 
-                gradients = tape.gradients(loss, self.trainable_variables)
-                self.all_contrast_optimizer.apply_gradients(zip(gradients, self.trainable_variables))
-
-
-
+                
+            #     gradients = tape.gradient(total_loss, self._trainable_variables)
+            #     self.all_contrast_optimizer.apply_gradients(zip(gradients, self._trainable_variables))
 
             # 1. Forward Dynamics Prediction Loss
             # Outputs from Dynamics Model are normalized delta predictions
@@ -798,8 +808,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
             #
 
             mu, logvar = (
-                mlp.mu,
-                mlp.logvar,
+                self.mlp.mu,
+                self.mlp.logvar,
             )  # [head_size, ensemble_size, traj_size, traj_length, obs_space_dims]
 
             bs_normalized_delta = normalize(
@@ -876,8 +886,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
             #     # 2. Backward Dynamics Prediction Loss
             #     # Outputs from Dynamics Model are normalized delta predictions
             back_mu, back_logvar = (
-                back_mlp.mu,
-                back_mlp.logvar,
+                self.back_mlp.mu,
+                self.back_mlp.logvar,
             )  # [head_size, ensemble_size, traj_size, traj_length, obs_space_dims]
 
             bs_normalized_back_delta = normalize(
@@ -959,8 +969,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
             if self.single_train :
             #
                 # Weight Decay
-                self.l2_reg_loss = tf.reduce_sum(mlp.l2_regs)
-                self.back_l2_reg_loss = tf.reduce_sum(back_mlp.l2_regs)
+                self.l2_reg_loss = tf.reduce_sum(self.mlp.l2_regs)
+                self.back_l2_reg_loss = tf.reduce_sum(self.back_mlp.l2_regs)
 
                 if self.deterministic:
                     self.recon_loss = self.mse_loss
@@ -1034,8 +1044,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.recon_loss = tf.reduce_sum(recon_loss)
                     self.ie_recon_loss = tf.reduce_sum(ie_recon_loss)
                     self.reg_loss = 0.01 * tf.reduce_sum(
-                        mlp.max_logvar
-                    ) - 0.01 * tf.reduce_sum(mlp.min_logvar)
+                        self.mlp.max_logvar
+                    ) - 0.01 * tf.reduce_sum(self.mlp.min_logvar)
 
                     # Backward
                     bs_back_invvar = tf.exp(-bs_back_logvar)
@@ -1097,8 +1107,8 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.back_recon_loss = tf.reduce_sum(back_recon_loss)
                     self.ie_back_recon_loss = tf.reduce_sum(ie_back_recon_loss)
                     self.back_reg_loss = 0.01 * tf.reduce_sum(
-                        back_mlp.max_logvar
-                    ) - 0.01 * tf.reduce_sum(back_mlp.min_logvar)
+                        self.back_mlp.max_logvar
+                    ) - 0.01 * tf.reduce_sum(self.back_mlp.min_logvar)
 
                     self.loss = (
                         self.recon_loss
@@ -1124,10 +1134,32 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     ) * self.weight_decay_coeff
 
 
-
-            self.optimizer = optimizer(self.learning_rate)
-            self.train_op = self.optimizer.minimize(self.loss)#,var_list=[mlp._params,back_mlp._params])
-            self.ie_train_op = self.optimizer.minimize(self.ie_loss)#,var_list=[mlp._params,back_mlp._params])
+            self._trainable_variables = (
+            list(self.back_mlp.get_param_values()) +
+            list(self.cp.get_param_values()) +
+            list(self.rn.get_param_values()))
+            
+            for var in self._trainable_variables:
+                print(f"Trainable variable: {var}")
+            self.optimizer = tf.keras.optimizers.Adam(learning_rate=self.learning_rate)
+            def train_step():
+                with tf.GradientTape() as tape:
+                    # Ensure loss computation involves forward pass for capturing gradients
+                    loss = self.loss
+                gradients = tape.gradient(loss, self._trainable_variables)
+                for grad, var in zip(gradients, self._trainable_variables):
+                    print(f"Gradient for {var.name}: {grad}")
+                self.optimizer.apply_gradients(zip(gradients, self._trainable_variables))
+            
+            def ie_train_step():
+                with tf.GradientTape() as tape:
+                    # Ensure ie_loss computation involves forward pass for capturing gradients
+                    ie_loss = self.ie_loss
+                gradients = tape.gradient(ie_loss, self._trainable_variables)
+                self.optimizer.apply_gradients(zip(gradients, self._trainable_variables))
+            
+            train_step()
+            ie_train_step()
 
             # tensor_utils
             self._get_cem_action = tensor_utils.compile_function(
@@ -1152,7 +1184,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.cem_init_var_ph,
                     self.simulation_param_ph,
                 ],
-                mlp.optimal_action_var,
+                self.mlp.optimal_action_var,
             )
             self._get_rs_action = tensor_utils.compile_function(
                 [
@@ -1174,7 +1206,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.norm_cp_act_std_ph,
                     self.simulation_param_ph,
                 ],
-                mlp.optimal_action_var,
+                self.mlp.optimal_action_var,
             )
 
             self._get_context_pred = tensor_utils.compile_function(
@@ -1186,7 +1218,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.norm_cp_act_mean_ph,
                     self.norm_cp_act_std_ph,
                 ],
-                mlp.inference_cp_var,
+                self.mlp.inference_cp_var,
             )  ## inference cp var
 
             self._get_embedding = tensor_utils.compile_function(
@@ -1198,7 +1230,7 @@ class MCLMultiHeadedCaDMDynamicsModel(Serializable, tf.Module):
                     self.norm_act_mean_ph,
                     self.norm_act_std_ph,
                 ],
-                mlp.embedding,
+                self.mlp.embedding,
             )  ## inference cp var
 
     def pdist_euclidean(self, A):

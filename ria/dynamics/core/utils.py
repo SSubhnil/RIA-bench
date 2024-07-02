@@ -182,7 +182,7 @@ def create_mcl_cadm_multiheaded_mlp(
             head_logvar = max_logvar - tf.nn.softplus(max_logvar - head_logvar)
             head_logvar = min_logvar + tf.nn.softplus(head_logvar - min_logvar)
 
-            denormalized_head_logvar = head_logvar + 2 * tf.log(norm_std)
+            denormalized_head_logvar = head_logvar + 2 * tf.math.log(norm_std)
             denormalized_head_std = tf.exp(denormalized_head_logvar / 2.0)
 
             xx = (
@@ -190,7 +190,6 @@ def create_mcl_cadm_multiheaded_mlp(
                 + tf.random.normal(tf.shape(denormalized_head_mu))
                 * denormalized_head_std
             )
-
         return xx, head_mu, head_logvar, embedding, max_logvar, min_logvar
 
     bs_input_proc_obs_var = obs_preproc_fn(bs_input_obs_var)
@@ -390,7 +389,7 @@ def create_mcl_cadm_multiheaded_mlp(
                 repeated_var = tf.tile(
                     constrained_var[:, None, :, :], [1, n, 1, 1]
                 )  # (m, n, h, act_dim)
-                actions = tf.truncated_normal(
+                actions = tf.random.truncated_normal(
                     [m, n, h, act_dim], repeated_mean, tf.sqrt(repeated_var)
                 )
 
@@ -643,6 +642,7 @@ def create_ensemble_multiheaded_context_predictor(
                 output_heads.append(head_xx)
 
             output = tf.stack(output_heads)
+
             return output
 
     else:
@@ -893,7 +893,7 @@ def create_relational_net(relation_hidden_sizes,
         for layer in layers:
             xx = layer(xx)
         return xx
-
+    
     return  l2_regs, forward
 
 
@@ -909,36 +909,28 @@ def denormalize(data_array, mean, std):
 def create_dense_layer(
     name, ensemble_size, input_dim, output_dim, activation, weight_decay=0.0
 ):
-    class EnsembleDenseLayer(tf.keras.layers.Layer):
-        def __init__(self, ensemble_size, input_dim, output_dim, activation, weight_decay, name):
-            super(EnsembleDenseLayer, self).__init__(name=name)
-            self.ensemble_size = ensemble_size
-            self.input_dim = input_dim
-            self.output_dim = output_dim
-            self.activation = activation
-            self.weight_decay = weight_decay
-            self.dense_layers = [
-                Dense(
-                    output_dim,
-                    activation=activation,
-                    kernel_initializer='glorot_uniform',
-                    kernel_regularizer=l2(weight_decay),
-                    name=f"{name}_dense_{i}"
-                )
-                for i in range(ensemble_size)
-            ]
+    weights = tf.Variable(
+        tf.random.truncated_normal(
+            [ensemble_size, input_dim, output_dim], stddev=1 / (2 * np.sqrt(input_dim))
+        ),
+        name="{}_weight".format(name),
+        trainable=True
+    )
+    biases = tf.Variable(
+        tf.zeros([ensemble_size, 1, output_dim]),
+        name="{}_bias".format(name),
+        trainable=True
+    )
 
-        def call(self, inputs):
-            outputs = tf.stack([dense_layer(inputs) for dense_layer in self.dense_layers], axis=0)
-            return outputs
+    l2_reg = tf.multiply(
+        weight_decay, tf.nn.l2_loss(weights), name="{}_l2_reg".format(name)
+    )
 
-    layer = EnsembleDenseLayer(ensemble_size, input_dim, output_dim, activation, weight_decay, name)
-
+    @tf.function(reduce_retracing=True)
     def _thunk(input_tensor):
-        out = layer(input_tensor)
+        out = tf.matmul(input_tensor, weights) + biases
+        if activation is not None:
+            out = activation(out)
         return out
 
-    l2_regs = [tf.nn.l2_loss(layer.dense_layers[i].kernel) for i in range(ensemble_size)]
-    total_l2_reg = tf.add_n(l2_regs)
-    
-    return _thunk, total_l2_reg
+    return _thunk, l2_reg
